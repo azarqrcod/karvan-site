@@ -97,6 +97,7 @@ jobs:
               await form.locator('button[data-channel="wa"]').click();
               await page.waitForURL(/api.whatsapp.com/,{timeout:6000});
               assert.match(page.url(),/phone=4917672161005/);
+              await page.goto('http://127.0.0.1:8088/#de-index',{waitUntil:'load'});
             });
             await test(mode+' modern design stylesheet loaded',async()=>{
               const ok=await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--k-background').trim()==='#f7f8f7');
