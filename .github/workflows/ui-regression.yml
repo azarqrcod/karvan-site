@@ -123,7 +123,9 @@ jobs:
                 await menu.locator('summary').click();
                 assert.equal(await menu.getAttribute('open'),'');
                 await menu.locator('a[href="#de-projekte"]').click();
+                await page.waitForFunction(()=>document.querySelector('#de-projekte')?.dataset.active==='true',{timeout:5000});
                 assert.equal(await page.locator('#de-projekte').isVisible(),true);
+                await page.waitForFunction(()=>!document.querySelector('.chrome-de details.mobile-nav-native')?.hasAttribute('open'),{timeout:5000});
                 assert.equal(await menu.getAttribute('open'),null);
               });
             }
