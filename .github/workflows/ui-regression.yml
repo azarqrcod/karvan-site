@@ -44,8 +44,10 @@ jobs:
               const sw=page.locator('.chrome-de .dynamic-langlink.active-lang-switch').first();
               assert.equal(await sw.count(),1,'No visible language link');
               await sw.click();
+              await page.waitForFunction(()=>document.querySelector('#en-projekte')?.dataset.active==='true',{timeout:5000});
               assert.equal(await page.locator('#en-projekte').isVisible(),true);
               await page.locator('.chrome-en .dynamic-langlink.active-lang-switch').first().click();
+              await page.waitForFunction(()=>document.querySelector('#de-projekte')?.dataset.active==='true',{timeout:5000});
               assert.equal(await page.locator('#de-projekte').isVisible(),true);
             });
             await test(mode+' 16 project photos and filtering',async()=>{
