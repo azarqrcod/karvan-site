@@ -1,0 +1,34 @@
+name: Check KARVAN domain HTTPS
+on:
+  push:
+    paths:
+      - .github/workflows/check-domain.yml
+  workflow_dispatch:
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - name: Check public DNS, HTTPS certificates and Pages state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          echo '=== DNS from public resolvers ==='
+          for domain in karvan-design.de www.karvan-design.de; do
+            echo "--- $domain"
+            for resolver in 1.1.1.1 8.8.8.8; do
+              echo "DNS resolver $resolver:"
+              for t in A AAAA CNAME CAA; do
+                echo "$t: $(dig @"$resolver" +short +time=3 +tries=1 "$domain" "$t" | tr '\n' ' ')"
+              done
+            done
+            echo "HTTPS headers:"
+            curl -k -sS -I --max-time 14 "https://$domain" | head -n 14 || true
+            echo "Certificate:"
+            echo | timeout 14 openssl s_client -connect "$domain:443" -servername "$domain" 2>/dev/null | openssl x509 -noout -subject -issuer -dates -ext subjectAltName 2>&1 | head -n 16 || true
+          done
+          echo '=== GitHub Pages API ==='
+          curl -sS --max-time 15 -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" "https://api.github.com/repos/azarqrcod/karvan-site/pages" | python3 -c 'import json,sys; d=json.load(sys.stdin); print({k:d.get(k) for k in ("status","cname","html_url","https_enforced","https_certificate","message")})' || true
