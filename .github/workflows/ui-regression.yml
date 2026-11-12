@@ -3,6 +3,8 @@ on:
   push:
     paths:
       - .github/workflows/ui-regression.yml
+      - index.html
+      - assets/css/karvan-premium.css
   workflow_dispatch:
 jobs:
   verify:
@@ -27,8 +29,8 @@ jobs:
           const browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox']});
           const checks=[];
           async function test(name,fn){try{await fn();checks.push('PASS '+name)}catch(e){checks.push('FAIL '+name+': '+e.message);throw e}}
-          for(const mode of ['desktop','mobile']){
-            const page=await browser.newPage({viewport:mode==='mobile'?{width:390,height:844}:{width:1440,height:900},isMobile:mode==='mobile',hasTouch:mode==='mobile'});
+          for(const mode of ['desktop','tablet','mobile']){
+            const page=await browser.newPage({viewport:mode==='mobile'?{width:390,height:844}:mode==='tablet'?{width:768,height:1024}:{width:1440,height:900},isMobile:mode!=='desktop',hasTouch:mode!=='desktop'});
             const errs=[];page.on('pageerror',e=>errs.push(e.message));
             await page.goto('http://127.0.0.1:8088/',{waitUntil:'domcontentloaded'});
             await test(mode+' default German homepage',async()=>{assert.equal(await page.locator('#de-index').isVisible(),true)});
@@ -96,6 +98,34 @@ jobs:
               await page.waitForURL(/api.whatsapp.com/,{timeout:6000});
               assert.match(page.url(),/phone=4917672161005/);
             });
+            await test(mode+' modern design stylesheet loaded',async()=>{
+              const ok=await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--k-background').trim()==='#f7f8f7');
+              assert.equal(ok,true,'Premium CSS not applied');
+            });
+            await test(mode+' creator attribution and secure link',async()=>{
+              await page.evaluate(()=>location.hash='de-index');
+              const a=page.locator('.chrome-de .footer-creator a');
+              assert.equal(await a.count(),1);
+              assert.equal(await a.getAttribute('href'),'https://azarqrcod.github.io/azarcore/');
+              await page.evaluate(()=>location.hash='en-index');
+              assert.equal(await page.locator('.chrome-en .footer-creator a').count(),1);
+            });
+            await test(mode+' no horizontal viewport overflow',async()=>{
+              await page.evaluate(()=>location.hash='de-index');
+              const d=await page.evaluate(()=>({width:document.documentElement.scrollWidth,window:window.innerWidth}));
+              assert.ok(d.width<=d.window+2,JSON.stringify(d));
+            });
+            if(mode!=='desktop'){
+              await test(mode+' mobile menu works',async()=>{
+                await page.evaluate(()=>location.hash='de-index');
+                const menu=page.locator('.chrome-de details.mobile-nav-native');
+                await menu.locator('summary').click();
+                assert.equal(await menu.getAttribute('open'),'');
+                await menu.locator('a[href="#de-projekte"]').click();
+                assert.equal(await page.locator('#de-projekte').isVisible(),true);
+                assert.equal(await menu.getAttribute('open'),null);
+              });
+            }
             await test(mode+' no script runtime errors',async()=>assert.equal(errs.length,0,errs.join(';')));
             await page.close();
           }
