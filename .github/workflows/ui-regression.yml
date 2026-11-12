@@ -1,0 +1,102 @@
+name: KARVAN UI regression tests
+on:
+  push:
+    paths:
+      - .github/workflows/ui-regression.yml
+  workflow_dispatch:
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up browser tests
+        run: |
+          npm install --no-save --ignore-scripts playwright@1.58.2
+          if ! command -v google-chrome >/dev/null 2>&1; then npx playwright install --with-deps chromium; fi
+      - name: Verify all navigation, filters, forms and photos
+        shell: bash
+        run: |
+          python3 -m http.server 8088 >/tmp/karvan-http.log 2>&1 &
+          sleep 2
+          node --input-type=module <<'JS'
+          import {chromium} from 'playwright';
+          import assert from 'node:assert/strict';
+          const browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox']});
+          const checks=[];
+          async function test(name,fn){try{await fn();checks.push('PASS '+name)}catch(e){checks.push('FAIL '+name+': '+e.message);throw e}}
+          for(const mode of ['desktop','mobile']){
+            const page=await browser.newPage({viewport:mode==='mobile'?{width:390,height:844}:{width:1440,height:900},isMobile:mode==='mobile',hasTouch:mode==='mobile'});
+            const errs=[];page.on('pageerror',e=>errs.push(e.message));
+            await page.goto('http://127.0.0.1:8088/',{waitUntil:'domcontentloaded'});
+            await test(mode+' default German homepage',async()=>{assert.equal(await page.locator('#de-index').isVisible(),true)});
+            await test(mode+' all 16 routes',async()=>{
+              for(const l of ['de','en'])for(const name of ['index','leistungen','projekte','ueber-uns','kontakt','anfrage','impressum','datenschutz']){
+                await page.evaluate(h=>location.hash=h,l+'-'+name);
+                assert.equal(await page.locator('#'+l+'-'+name).isVisible(),true,l+'-'+name+' not visible');
+                assert.equal(await page.locator('.virtual-page[data-active="true"]').count(),1,'many visible pages');
+              }
+            });
+            await page.evaluate(()=>location.hash='de-projekte');
+            await test(mode+' switch same route to English',async()=>{
+              const sw=page.locator('.chrome-de .dynamic-langlink.active-lang-switch').first();
+              assert.equal(await sw.count(),1,'No visible language link');
+              await sw.click();
+              assert.equal(await page.locator('#en-projekte').isVisible(),true);
+              await page.locator('.chrome-en .dynamic-langlink.active-lang-switch').first().click();
+              assert.equal(await page.locator('#de-projekte').isVisible(),true);
+            });
+            await test(mode+' 16 project photos and filtering',async()=>{
+              assert.equal(await page.locator('#de-projekte .project-tile').count(),16);
+              let img=await page.locator('#de-projekte .project-tile img').evaluateAll(xs=>xs.map(x=>x.getAttribute('src')));
+              assert.equal(img.length,16);assert.equal(new Set(img).size,16);
+              await page.locator('#de-projekte [data-filter="bathroom"]').click();
+              assert.equal(await page.locator('#de-projekte .project-tile:not([hidden])').count(),1);
+              await page.locator('#de-projekte [data-filter="all"]').click();
+            });
+            await test(mode+' gallery photo modal',async()=>{
+              await page.locator('#de-projekte .project-tile button.project-image').first().click();
+              assert.equal(await page.locator('#de-projekte dialog[open]').count(),1);
+              await page.locator('#de-projekte [data-next]').click();
+              await page.locator('#de-projekte [data-close]').click();
+              assert.equal(await page.locator('#de-projekte dialog[open]').count(),0);
+            });
+            await test(mode+' all in-page link targets exist',async()=>{
+              const bad=await page.evaluate(()=>[...document.querySelectorAll('a[href^="#"]')].filter(a=>!document.getElementById(a.hash.slice(1))).map(a=>a.href));
+              assert.equal(bad.length,0,JSON.stringify(bad));
+            });
+            await page.evaluate(()=>location.hash='de-anfrage');
+            await test(mode+' email form validation + AJAX submission',async()=>{
+              await page.route('https://formsubmit.co/ajax/**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({success:'true',message:'Sent'})}));
+              const form=page.locator('#enquiryForm-de');
+              await form.locator('[name=fullname]').fill('KARVAN TEST');
+              await form.locator('[name=reply]').fill('test@example.com');
+              await form.locator('[name=service]').selectOption({index:1});
+              await form.locator('[name=message]').fill('Test project inquiry for the automated verification.');
+              await form.locator('[name=consent]').check();
+              await form.locator('button[data-channel="email"]').click();
+              await page.waitForTimeout(450);
+              assert.match(await form.locator('.form-feedback').innerText(),/Anfrage an den Formular-Dienst|Anfrage.*übergeben/);
+            });
+            await test(mode+' WhatsApp contact URL',async()=>{
+              const a=await page.locator('.floating-whatsapp').getAttribute('href');
+              assert.match(a,/api.whatsapp.com\/send\?phone=4917672161005/);
+              await page.route('https://api.whatsapp.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'WhatsApp destination verified'}));
+              const form=page.locator('#enquiryForm-de');
+              await form.locator('[name=fullname]').fill('KARVAN TEST');
+              await form.locator('[name=reply]').fill('test@example.com');
+              await form.locator('[name=service]').selectOption({index:1});
+              await form.locator('[name=message]').fill('Test WhatsApp project request');
+              await form.locator('[name=consent]').check();
+              await form.locator('button[data-channel="wa"]').click();
+              await page.waitForURL(/api.whatsapp.com/,{timeout:6000});
+              assert.match(page.url(),/phone=4917672161005/);
+            });
+            await test(mode+' no script runtime errors',async()=>assert.equal(errs.length,0,errs.join(';')));
+            await page.close();
+          }
+          console.log(checks.join('\n'));
+          await browser.close();
+          JS
