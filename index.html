@@ -276,6 +276,11 @@ document.querySelectorAll('.enquiry-form').forEach(form=>{
  const lang=form.closest('.virtual-page')?.dataset.lang||'de',german=lang==='de';
  const feedback=form.querySelector('.form-feedback'), submit=form.querySelector('button[data-channel="email"]');
  const wa=form.querySelector('button[data-channel="wa"]');
+ const buildEmailUrl=()=> 'mailto:info@karvan-design.de?subject='+encodeURIComponent('KARVAN - Project enquiry')+'&body='+encodeURIComponent(makeMessage(form));
+ const directEmail=form.querySelector('.alt-email');
+ const directWhatsApp=form.querySelector('.alt-whatsapp');
+ if(directEmail)directEmail.addEventListener('click',()=>{directEmail.href=buildEmailUrl();});
+ if(directWhatsApp)directWhatsApp.addEventListener('click',()=>{directWhatsApp.href='https://api.whatsapp.com/send?phone=4917672161005&text='+encodeURIComponent(makeMessage(form));});
  if(wa)wa.addEventListener('click',()=>{
    if(!form.reportValidity())return;
    const url='https://api.whatsapp.com/send?phone=4917672161005&text='+encodeURIComponent(makeMessage(form));
@@ -290,11 +295,33 @@ document.querySelectorAll('.enquiry-form').forEach(form=>{
    try{
     const response=await fetch('https://formsubmit.co/ajax/info@karvan-design.de',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},body:JSON.stringify(payload)});
     const data=await response.json();
-    if(!response.ok||data.success===false||String(data.success).toLowerCase()==='false')throw Error(data.message||'Submission failed');
+    if(!response.ok||!(data.success===true||String(data.success).toLowerCase()==='true'))throw Error(data.message||'FormSubmit did not confirm the request');
     feedback.textContent=window.KARVAN_FORM_NOTICES?.[lang]?.success||(german?'Anfrage an den Formular-Dienst übergeben. Bei der ersten Nutzung muss KARVAN die Aktivierungs-E-Mail bestätigen, bevor Anfragen im Postfach ankommen.':'Enquiry accepted by the form provider. KARVAN must confirm the first activation email before messages can be delivered.');
     feedback.dataset.state='success';form.reset();
    }catch(error){
-    feedback.textContent=window.KARVAN_FORM_NOTICES?.[lang]?.error||(german?'Automatischer Versand fehlgeschlagen. Bitte kontaktieren Sie uns per E-Mail oder WhatsApp.':'Automatic submission failed. Please contact us by email or WhatsApp.');
+    const activation=/activat|confirm|bestätig|freischalt/i.test(String(error.message||''));
+    const activationTexts={
+      de:'FormSubmit ist noch nicht aktiviert. KARVAN muss die Aktivierungs-E-Mail im Postfach info@karvan-design.de bestätigen. Ihre Anfrage wurde nicht als zugestellt bestätigt.',
+      en:'FormSubmit is not activated yet. KARVAN must confirm the activation email sent to info@karvan-design.de. Your enquiry is not confirmed as delivered.',
+      fa:'ارسال خودکار هنوز فعال نشده است. شرکت باید ایمیل فعال‌سازی FormSubmit را در info@karvan-design.de تأیید کند. تحویل درخواست شما هنوز تأیید نشده است.',
+      tr:'FormSubmit henüz etkinleştirilmedi. KARVAN, info@karvan-design.de adresine gönderilen etkinleştirme e-postasını onaylamalıdır. Talebin teslimi doğrulanmadı.',
+      ar:'لم يتم تفعيل FormSubmit بعد. يجب على كارڤان تأكيد رسالة التفعيل في info@karvan-design.de. لم يتم تأكيد وصول الطلب.'
+    };
+    const genericTexts={
+      de:'Automatischer E-Mail-Versand fehlgeschlagen. Ihre Anfrage wurde nicht als zugestellt bestätigt. Nutzen Sie WhatsApp oder das E-Mail-Programm.',
+      en:'Automatic email submission failed. Delivery is not confirmed. Use WhatsApp or your email app.',
+      fa:'ارسال خودکار ایمیل ناموفق بود و تحویل درخواست تأیید نشده است. از واتساپ یا برنامه ایمیل استفاده کنید.',
+      tr:'Otomatik e-posta gönderimi başarısız oldu. Teslimat doğrulanmadı. WhatsApp veya e-posta uygulamanızı kullanın.',
+      ar:'فشل الإرسال التلقائي ولم يتم تأكيد وصول الطلب. استخدم واتساب أو تطبيق البريد.'
+    };
+    feedback.textContent=activation?activationTexts[lang]||activationTexts.de:genericTexts[lang]||genericTexts.de;
+    const fallback=document.createElement('a');
+    fallback.className='karvan-mailto-fallback';
+    fallback.href=buildEmailUrl();
+    fallback.textContent=({de:'Diese Anfrage mit E-Mail-Programm senden',en:'Send enquiry with email app',fa:'ارسال همین درخواست با برنامه ایمیل',tr:'Bu talebi e-posta uygulamasıyla gönder',ar:'أرسل هذا الطلب عبر تطبيق البريد'})[lang]||'Email';
+    fallback.style.cssText='display:inline-flex;margin:12px 0 0;padding:10px 15px;border:1px solid #9fc4d4;background:#eaf4f8;color:#074d70;border-radius:8px;font-weight:750;text-decoration:none;';
+    feedback.appendChild(document.createTextNode(' '));
+    feedback.appendChild(fallback);
     feedback.dataset.state='error';
     console.warn('KARVAN form delivery error',error);
    }finally{if(submit){submit.disabled=false;submit.removeAttribute('aria-busy');}}
