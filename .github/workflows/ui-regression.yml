@@ -6,6 +6,8 @@ on:
       - index.html
       - karvan-i18n-data.js
       - karvan-i18n.js
+      - karvan-menu.js
+      - karvan-menu.css
       - assets/css/karvan-premium.css
   workflow_dispatch:
 jobs:
@@ -193,6 +195,52 @@ jobs:
                 assert.equal(await menu.getAttribute('open'),null);
               });
             }
+            await test(mode+' professional menu design and all five language actions',async()=>{
+              for(const l of ['de','en','fa','tr','ar']){
+                await page.evaluate(lang=>location.hash=lang+'-index',l);
+                await page.waitForFunction(lang=>document.querySelector('#'+lang+'-index')?.dataset.active==='true',l);
+                const menu=page.locator('.chrome-'+l+' details.mobile-nav-native');
+                assert.equal(await menu.count(),1,'Missing '+l+' menu');
+                assert.equal(await menu.locator('.k-menu-link').count(),5,l+' links not built');
+                assert.equal(await menu.locator('.k-menu-quote').getAttribute('href'),'#'+l+'-anfrage');
+                assert.equal(await menu.locator('.k-menu-footer a').count(),2);
+                const wa=await menu.locator('.k-menu-wa').getAttribute('href');
+                assert.match(wa,/api.whatsapp.com\/send\?phone=4917672161005/);
+                const email=await menu.locator('.k-menu-direct-link').last().getAttribute('href');
+                assert.equal(email,'mailto:info@karvan-design.de');
+                if(mode!=='desktop'){
+                  await menu.locator('summary').click();
+                  await page.waitForFunction(lang=>document.querySelector('.chrome-'+lang+' .mobile-nav-native')?.open===true,l);
+                  assert.equal(await menu.locator('.k-menu-drawer').isVisible(),true);
+                  const dims=await menu.locator('.k-menu-drawer').boundingBox();
+                  assert.ok(dims&&dims.x>=0&&dims.width>240&&dims.height>300,JSON.stringify(dims));
+                  assert.ok(dims.y>=0&&dims.y+dims.height<=page.viewportSize().height+2,JSON.stringify(dims));
+                  await menu.locator('a.k-menu-quote').click();
+                  await page.waitForFunction(lang=>document.querySelector('#'+lang+'-anfrage')?.dataset.active==='true',l);
+                  assert.equal(await menu.getAttribute('open'),null);
+                  await menu.locator('summary').click();
+                  await page.keyboard.press('Escape');
+                  await page.waitForFunction(lang=>!document.querySelector('.chrome-'+lang+' .mobile-nav-native')?.open,l);
+                  await menu.locator('summary').click();
+                  await menu.locator('a[href="#'+l+'-projekte"]').click();
+                  await page.waitForFunction(lang=>document.querySelector('#'+lang+'-projekte')?.dataset.active==='true',l);
+                  assert.equal(await menu.getAttribute('open'),null);
+                }
+              }
+              await page.evaluate(()=>location.hash='de-index');
+            });
+            await test(mode+' key actions, consent, accessibility and search visibility',async()=>{
+              assert.equal(await page.locator('meta[name="robots"]').getAttribute('content'),'index, follow');
+              const buttons=await page.locator('#de-index .hero-buttons a[href^="#"]').evaluateAll(xs=>xs.map(a=>a.getAttribute('href')));
+              assert.ok(buttons.includes('#de-anfrage'),'Main quote button missing');
+              for(const selector of ['#de-kontakt a[href^="mailto:"]','#de-kontakt a[href*="wa.me"],#de-kontakt a[href*="api.whatsapp.com"]']){
+                assert.ok(await page.locator(selector).count()>0,selector);
+              }
+              const bad=await page.evaluate(()=>[...document.querySelectorAll('a[href^="#"]')]
+                .filter(a=>!document.getElementById(a.getAttribute('href').slice(1)))
+                .map(a=>a.getAttribute('href')));
+              assert.deepEqual(bad,[]);
+            });
             await test(mode+' no script runtime errors',async()=>assert.equal(errs.length,0,errs.join(';')));
             await page.close();
           }
