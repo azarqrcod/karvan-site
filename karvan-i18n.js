@@ -39,7 +39,7 @@ function cloneLanguage(base,lang){
   else el.id=lang+'-'+el.id;
  }
  for(const el of clone.querySelectorAll('[href^="#de-"]')){
-  el.setAttribute('href','#'+lang+el.getAttribute('href').slice(4));
+  el.setAttribute('href','#'+lang+'-'+el.getAttribute('href').slice(4));
  }
  for(const el of clone.querySelectorAll('input[name="_url"]')){
   el.value='https://karvan-design.de/#'+lang+'-anfrage';
