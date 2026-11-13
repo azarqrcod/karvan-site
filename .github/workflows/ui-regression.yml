@@ -33,6 +33,7 @@ jobs:
           const browser=await chromium.launch({headless:true,channel:'chrome',args:['--no-sandbox']});
           const checks=[];
           async function test(name,fn){try{await fn();checks.push('PASS '+name)}catch(e){checks.push('FAIL '+name+': '+e.message);throw e}}
+          async function pointerTap(page,locator){await locator.scrollIntoViewIfNeeded();const r=await locator.boundingBox();assert.ok(r,'Missing pointer target');await page.mouse.click(r.x+r.width/2,r.y+r.height/2);}
           for(const mode of ['desktop','tablet','mobile']){
             const page=await browser.newPage({viewport:mode==='mobile'?{width:390,height:844}:mode==='tablet'?{width:768,height:1024}:{width:1440,height:900},isMobile:mode!=='desktop',hasTouch:mode!=='desktop'});
             const errs=[];page.on('pageerror',e=>errs.push(e.message));
@@ -209,23 +210,20 @@ jobs:
                 const email=await menu.locator('.k-menu-direct-link').last().getAttribute('href');
                 assert.equal(email,'mailto:info@karvan-design.de');
                 if(mode!=='desktop'){
-                  console.log('DIAGNOSTIC-MENU-'+mode+'-'+l,await menu.locator('summary').evaluate(el=>{const b=el.getBoundingClientRect();const x=b.x+b.width/2,y=b.y+b.height/2;return {box:{x:b.x,y:b.y,width:b.width,height:b.height},innerWidth,screenHit:document.elementFromPoint(x,y)?.outerHTML?.slice(0,160),direction:getComputedStyle(el).direction,bodyOverflow:getComputedStyle(document.body).overflow}}));
-                  await menu.locator('summary').scrollIntoViewIfNeeded();
-                  console.log('POST-SCROLL-'+mode+'-'+l,await menu.locator('summary').evaluate(el=>{const b=el.getBoundingClientRect();let x=b.x+b.width/2,y=b.y+b.height/2;return {x,y,scrollX,scrollY,htmlWidth:document.documentElement.scrollWidth,innerWidth,hit:document.elementFromPoint(x,y)?.outerHTML?.slice(0,120)}}));
-                  await menu.locator('summary').click({timeout:3500});
+                  await pointerTap(page,menu.locator('summary'));
                   await page.waitForFunction(lang=>document.querySelector('.chrome-'+lang+' .mobile-nav-native')?.open===true,l);
                   assert.equal(await menu.locator('.k-menu-drawer').isVisible(),true);
                   const dims=await menu.locator('.k-menu-drawer').boundingBox();
                   assert.ok(dims&&dims.x>=0&&dims.width>240&&dims.height>300,JSON.stringify(dims));
                   assert.ok(dims.y>=0&&dims.y+dims.height<=page.viewportSize().height+2,JSON.stringify(dims));
-                  await menu.locator('a.k-menu-quote').click();
+                  await pointerTap(page,menu.locator('a.k-menu-quote'));
                   await page.waitForFunction(lang=>document.querySelector('#'+lang+'-anfrage')?.dataset.active==='true',l);
                   assert.equal(await menu.getAttribute('open'),null);
-                  await menu.locator('summary').click();
+                  await pointerTap(page,menu.locator('summary'));
                   await page.keyboard.press('Escape');
                   await page.waitForFunction(lang=>!document.querySelector('.chrome-'+lang+' .mobile-nav-native')?.open,l);
-                  await menu.locator('summary').click();
-                  await menu.locator('a[href="#'+l+'-projekte"]').click();
+                  await pointerTap(page,menu.locator('summary'));
+                  await pointerTap(page,menu.locator('a[href="#'+l+'-projekte"]'));
                   await page.waitForFunction(lang=>document.querySelector('#'+lang+'-projekte')?.dataset.active==='true',l);
                   assert.equal(await menu.getAttribute('open'),null);
                 }
