@@ -107,6 +107,66 @@ body.js-router[data-active-lang="ar"] .site-chrome.chrome-ar{display:block!impor
 [dir="rtl"] .nav-items,[dir="rtl"] .mobile-nav-native nav{direction:rtl}
 [dir="rtl"] .enquiry-form{text-align:right}
 [dir="rtl"] .hero-panel .btn{letter-spacing:normal}
+
+/* Clean hero: the team photo should be visible instead of covered by marketing copy. */
+.hero-home .hero-photo-badge,
+.hero-home .hero-panel .kicker-white{display:none!important}
+@media(max-width:920px){
+ .virtual-page .hero-home{
+  display:flex!important;flex-direction:column!important;
+  min-height:0!important;height:auto!important;overflow:hidden;
+  background:#071924!important;
+ }
+ .virtual-page .hero-home::before,
+ .virtual-page .hero-home::after{display:none!important}
+ .virtual-page .hero-home .hero-photo{
+  display:block!important;position:relative!important;
+  inset:auto!important;left:auto!important;right:auto!important;
+  top:auto!important;bottom:auto!important;
+  width:100%!important;height:clamp(280px,69vw,435px)!important;
+  min-height:0!important;opacity:1!important;z-index:0!important;
+  overflow:hidden!important;
+ }
+ .virtual-page .hero-home .hero-photo img{
+  display:block;width:100%;height:100%;
+  object-fit:cover;object-position:center 31%;filter:saturate(.98) contrast(1.01);
+ }
+ .virtual-page .hero-home .hero-photo::after{
+  background:linear-gradient(0deg,rgba(7,25,36,.46),transparent 24%)!important;
+ }
+ .virtual-page .hero-home .hero-home-inner{
+  display:block!important;position:relative!important;
+  width:calc(100% - 42px)!important;max-width:1140px!important;
+  min-height:0!important;height:auto!important;
+  margin:0 auto!important;padding:0 0 31px!important;
+  background:transparent!important;
+ }
+ .virtual-page .hero-home .hero-panel{
+  display:block!important;width:100%!important;max-width:680px!important;
+  position:relative!important;z-index:2!important;
+  padding:26px 0 14px!important; margin:0!important;
+ }
+ .virtual-page .hero-home .hero-panel h1{
+  font-size:clamp(35px,7.6vw,55px)!important;
+  line-height:1.16!important;letter-spacing:-.045em;
+  margin:0 0 17px!important;text-wrap:balance;
+ }
+ .virtual-page .hero-home .hero-panel>p{
+  font-size:clamp(14px,2.05vw,16px)!important;line-height:1.77!important;
+  margin:0 0 23px!important;max-width:630px!important;color:#dce9ec;
+ }
+ .virtual-page .hero-home .hero-buttons{gap:12px!important;display:flex;flex-wrap:wrap}
+ .virtual-page .hero-home .hero-mini{margin-top:29px!important}
+}
+@media(max-width:480px){
+ .virtual-page .hero-home .hero-photo{height:clamp(260px,79vw,365px)!important}
+ .virtual-page .hero-home .hero-home-inner{width:calc(100% - 38px)!important}
+ .virtual-page .hero-home .hero-panel h1{font-size:clamp(35px,8.8vw,43px)!important}
+ .virtual-page .hero-home .hero-buttons{gap:11px!important}
+ .virtual-page .hero-home .hero-buttons .btn{min-height:47px}
+}
+[dir="rtl"] .virtual-page .hero-home .hero-panel h1{letter-spacing:normal!important}
+
 .hero-home .hero-photo img{animation:karvanHeroSlowZoom 18s ease-in-out infinite alternate;transform-origin:50% 43%;will-change:transform}
 @keyframes karvanHeroSlowZoom{0%{transform:scale(1) translate3d(0,0,0)}100%{transform:scale(1.06) translate3d(0,-.6%,0)}}
 @media(prefers-reduced-motion:reduce){.hero-home .hero-photo img{animation:none!important;will-change:auto}}
