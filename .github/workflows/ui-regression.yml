@@ -4,6 +4,8 @@ on:
     paths:
       - .github/workflows/ui-regression.yml
       - index.html
+      - karvan-i18n-data.js
+      - karvan-i18n.js
       - assets/css/karvan-premium.css
   workflow_dispatch:
 jobs:
@@ -34,23 +36,31 @@ jobs:
             const errs=[];page.on('pageerror',e=>errs.push(e.message));
             await page.goto('http://127.0.0.1:8088/',{waitUntil:'domcontentloaded'});
             await test(mode+' default German homepage',async()=>{assert.equal(await page.locator('#de-index').isVisible(),true)});
-            await test(mode+' all 16 routes',async()=>{
-              for(const l of ['de','en'])for(const name of ['index','leistungen','projekte','ueber-uns','kontakt','anfrage','impressum','datenschutz']){
+            await test(mode+' all 40 routes in five languages',async()=>{
+              for(const l of ['de','en','fa','tr','ar'])for(const name of ['index','leistungen','projekte','ueber-uns','kontakt','anfrage','impressum','datenschutz']){
                 await page.evaluate(h=>location.hash=h,l+'-'+name);
                 assert.equal(await page.locator('#'+l+'-'+name).isVisible(),true,l+'-'+name+' not visible');
                 assert.equal(await page.locator('.virtual-page[data-active="true"]').count(),1,'many visible pages');
               }
             });
             await page.evaluate(()=>location.hash='de-projekte');
-            await test(mode+' switch same route to English',async()=>{
-              const sw=page.locator('.chrome-de .dynamic-langlink.active-lang-switch').first();
-              assert.equal(await sw.count(),1,'No visible language link');
-              await sw.click();
+            await test(mode+' five-language selector keeps current route',async()=>{
+              const de=page.locator('.chrome-de .karvan-lang-control');
+              assert.equal(await de.count(),1,'Language selector missing');
+              await de.selectOption('fa');
+              await page.waitForFunction(()=>document.querySelector('#fa-projekte')?.dataset.active==='true',{timeout:5000});
+              assert.equal(await page.locator('#fa-projekte').isVisible(),true);
+              assert.equal(await page.locator('html').getAttribute('dir'),'rtl');
+              await page.locator('.chrome-fa .karvan-lang-control').selectOption('ar');
+              await page.waitForFunction(()=>document.querySelector('#ar-projekte')?.dataset.active==='true',{timeout:5000});
+              assert.equal(await page.locator('html').getAttribute('dir'),'rtl');
+              await page.locator('.chrome-ar .karvan-lang-control').selectOption('tr');
+              await page.waitForFunction(()=>document.querySelector('#tr-projekte')?.dataset.active==='true',{timeout:5000});
+              assert.equal(await page.locator('html').getAttribute('dir'),'ltr');
+              await page.locator('.chrome-tr .karvan-lang-control').selectOption('en');
               await page.waitForFunction(()=>document.querySelector('#en-projekte')?.dataset.active==='true',{timeout:5000});
-              assert.equal(await page.locator('#en-projekte').isVisible(),true);
-              await page.locator('.chrome-en .dynamic-langlink.active-lang-switch').first().click();
+              await page.locator('.chrome-en .karvan-lang-control').selectOption('de');
               await page.waitForFunction(()=>document.querySelector('#de-projekte')?.dataset.active==='true',{timeout:5000});
-              assert.equal(await page.locator('#de-projekte').isVisible(),true);
             });
             await test(mode+' 16 project photos and filtering',async()=>{
               assert.equal(await page.locator('#de-projekte .project-tile').count(),16);
@@ -75,8 +85,10 @@ jobs:
             await test(mode+' email form validation + AJAX submission',async()=>{
               await page.route('https://formsubmit.co/ajax/**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({success:'true',message:'Sent'})}));
               const form=page.locator('#enquiryForm-de');
-              await form.locator('[name=fullname]').fill('KARVAN TEST');
-              await form.locator('[name=reply]').fill('test@example.com');
+              assert.equal(await form.locator('[name=fullname]').getAttribute('required'),null);
+              assert.equal(await form.locator('[name=phone]').getAttribute('required'),null);
+              assert.equal(await form.locator('[name=email]').getAttribute('required'),'');
+              await form.locator('[name=email]').fill('test@example.com');
               await form.locator('[name=service]').selectOption({index:1});
               await form.locator('[name=message]').fill('Test project inquiry for the automated verification.');
               await form.locator('[name=consent]').check();
@@ -89,8 +101,10 @@ jobs:
               assert.match(a,/api.whatsapp.com\/send\?phone=4917672161005/);
               await page.route('https://api.whatsapp.com/**',route=>route.fulfill({status:200,contentType:'text/html',body:'WhatsApp destination verified'}));
               const form=page.locator('#enquiryForm-de');
-              await form.locator('[name=fullname]').fill('KARVAN TEST');
-              await form.locator('[name=reply]').fill('test@example.com');
+              assert.equal(await form.locator('[name=fullname]').getAttribute('required'),null);
+              assert.equal(await form.locator('[name=phone]').getAttribute('required'),null);
+              assert.equal(await form.locator('[name=email]').getAttribute('required'),'');
+              await form.locator('[name=email]').fill('test@example.com');
               await form.locator('[name=service]').selectOption({index:1});
               await form.locator('[name=message]').fill('Test WhatsApp project request');
               await form.locator('[name=consent]').check();
@@ -98,6 +112,16 @@ jobs:
               await page.waitForURL(/api.whatsapp.com/,{timeout:6000});
               assert.match(page.url(),/phone=4917672161005/);
               await page.goto('http://127.0.0.1:8088/#de-index',{waitUntil:'load'});
+            });
+            await test(mode+' localized forms and gentle photo animation',async()=>{
+              for(const l of ['fa','tr','ar']){
+                const form=page.locator('#enquiryForm-'+l);
+                assert.equal(await form.count(),1,l+' form missing');
+                assert.equal(await form.locator('[name=email]').getAttribute('required'),'');
+                assert.equal(await form.locator('[name=phone]').getAttribute('required'),null);
+              }
+              const motion=await page.locator('#de-index .hero-photo img').evaluate(el=>getComputedStyle(el).animationName);
+              assert.match(motion,/karvanHeroSlowZoom/);
             });
             await test(mode+' modern design stylesheet loaded',async()=>{
               const ok=await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--k-background').trim()==='#f7f8f7');
