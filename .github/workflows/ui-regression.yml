@@ -210,7 +210,9 @@ jobs:
                 assert.equal(email,'mailto:info@karvan-design.de');
                 if(mode!=='desktop'){
                   console.log('DIAGNOSTIC-MENU-'+mode+'-'+l,await menu.locator('summary').evaluate(el=>{const b=el.getBoundingClientRect();const x=b.x+b.width/2,y=b.y+b.height/2;return {box:{x:b.x,y:b.y,width:b.width,height:b.height},innerWidth,screenHit:document.elementFromPoint(x,y)?.outerHTML?.slice(0,160),direction:getComputedStyle(el).direction,bodyOverflow:getComputedStyle(document.body).overflow}}));
-                  await menu.locator('summary').click();
+                  await menu.locator('summary').scrollIntoViewIfNeeded();
+                  console.log('POST-SCROLL-'+mode+'-'+l,await menu.locator('summary').evaluate(el=>{const b=el.getBoundingClientRect();let x=b.x+b.width/2,y=b.y+b.height/2;return {x,y,scrollX,scrollY,htmlWidth:document.documentElement.scrollWidth,innerWidth,hit:document.elementFromPoint(x,y)?.outerHTML?.slice(0,120)}}));
+                  await menu.locator('summary').click({timeout:3500});
                   await page.waitForFunction(lang=>document.querySelector('.chrome-'+lang+' .mobile-nav-native')?.open===true,l);
                   assert.equal(await menu.locator('.k-menu-drawer').isVisible(),true);
                   const dims=await menu.locator('.k-menu-drawer').boundingBox();
