@@ -96,6 +96,26 @@ jobs:
               await page.waitForTimeout(450);
               assert.match(await form.locator('.form-feedback').innerText(),/Anfrage an den Formular-Dienst|Anfrage.*übergeben/);
             });
+            await test(mode+' activation failure provides filled Email and WhatsApp fallback',async()=>{
+              await page.unroute('https://formsubmit.co/ajax/**');
+              await page.route('https://formsubmit.co/ajax/**',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({success:'false',message:'This form needs Activation. Check your email to activate.'})}));
+              await page.evaluate(()=>location.hash='de-anfrage');
+              const form=page.locator('#enquiryForm-de');
+              await form.locator('[name=email]').fill('test@example.com');
+              await form.locator('[name=service]').selectOption({index:1});
+              await form.locator('[name=message]').fill('Reference project details for a test request');
+              await form.locator('[name=consent]').check();
+              await form.locator('button[data-channel="email"]').click();
+              await page.waitForFunction(()=>document.querySelector('#formFeedback-de')?.dataset.state==='error',{timeout:5000});
+              const feedback=await form.locator('.form-feedback').innerText();
+              assert.match(feedback,/aktiviert|Aktivierungs-E-Mail/i);
+              const mail=await form.locator('.karvan-mailto-fallback').getAttribute('href');
+              assert.ok(mail.startsWith('mailto:info@karvan-design.de?'));
+              assert.ok(decodeURIComponent(mail).includes('Reference project details for a test request'));
+              const directWA=await form.locator('.alt-whatsapp').evaluate(a=>{const event=new MouseEvent('click',{bubbles:true,cancelable:true});a.addEventListener('click',e=>e.preventDefault(),{once:true});a.dispatchEvent(event);return a.getAttribute('href')});
+              assert.ok(directWA.includes('phone=4917672161005'));
+              assert.ok(decodeURIComponent(directWA).includes('Reference project details for a test request'));
+            });
             await test(mode+' WhatsApp contact URL',async()=>{
               const a=await page.locator('.floating-whatsapp').getAttribute('href');
               assert.match(a,/api.whatsapp.com\/send\?phone=4917672161005/);
