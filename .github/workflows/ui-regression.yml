@@ -113,6 +113,26 @@ jobs:
               assert.match(page.url(),/phone=4917672161005/);
               await page.goto('http://127.0.0.1:8088/#de-index',{waitUntil:'load'});
             });
+            await test(mode+' hero photo has no text overlay on small screens',async()=>{
+              for(const l of ['de','en','fa','tr','ar']){
+                await page.evaluate(h=>location.hash=h,l+'-index');
+                await page.waitForFunction(x=>document.querySelector('#'+x)?.dataset.active==='true',l+'-index');
+                const data=await page.locator('#'+l+'-index').evaluate(root=>{
+                  const photo=root.querySelector('.hero-home .hero-photo');
+                  const text=root.querySelector('.hero-home .hero-panel');
+                  const badge=root.querySelector('.hero-photo-badge');
+                  return {
+                    imageBottom:photo.getBoundingClientRect().bottom,
+                    textTop:text.getBoundingClientRect().top,
+                    badgeHidden:getComputedStyle(badge).display==='none'
+                  };
+                });
+                assert.equal(data.badgeHidden,true,l+' badge remains on photo');
+                if(mode!=='desktop')assert.ok(data.textTop>=data.imageBottom-2,
+                  l+' content overlaps photo: '+JSON.stringify(data));
+              }
+              await page.evaluate(()=>location.hash='de-index');
+            });
             await test(mode+' localized forms and gentle photo animation',async()=>{
               for(const l of ['fa','tr','ar']){
                 const form=page.locator('#enquiryForm-'+l);
