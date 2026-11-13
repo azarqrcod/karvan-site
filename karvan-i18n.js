@@ -66,7 +66,7 @@ for(const chrome of document.querySelectorAll('.site-chrome:not(.bottom-chrome)'
  const label=document.createElement('label');label.className='karvan-lang-picker';
  label.setAttribute('aria-label',languages[current]);
  const select=document.createElement('select');select.className='karvan-lang-control';select.setAttribute('aria-label',languages[current]);
- for(const lang of all){const option=document.createElement('option');option.value=lang;option.textContent=lang.toUpperCase();option.setAttribute('label',lang.toUpperCase()+' · '+names[lang]);select.append(option);}
+ for(const lang of all){const option=document.createElement('option');option.value=lang;option.textContent=lang.toUpperCase();option.setAttribute('title',names[lang]);select.append(option);}
  select.value=current;
  select.addEventListener('change',()=>{
   const active=location.hash.slice(1);
